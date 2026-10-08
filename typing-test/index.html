@@ -11,9 +11,8 @@
     --text: #1d2330;
     --muted: #6b7385;
     --accent: #3b6ef5;
-    --correct: #1f9d55;
-    --wrong: #d64545;
-    --wrong-bg: #fde8e8;
+    --warn: #d98a00;
+    --stop: #d64545;
     --border: #dde1e8;
   }
   @media (prefers-color-scheme: dark) {
@@ -23,9 +22,8 @@
       --text: #e6e8ee;
       --muted: #8a91a3;
       --accent: #6b93ff;
-      --correct: #4cc38a;
-      --wrong: #ff6b6b;
-      --wrong-bg: #3a1f22;
+      --warn: #f0a92e;
+      --stop: #ff6b6b;
       --border: #2d313b;
     }
   }
@@ -55,47 +53,35 @@
     padding: 6px 12px;
   }
   button { cursor: pointer; }
-  button:hover { border-color: var(--accent); }
+  button:hover:not(:disabled) { border-color: var(--accent); }
   button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
-  button:disabled { opacity: .5; cursor: not-allowed; }
+  button:disabled { opacity: .45; cursor: not-allowed; }
   input[type="number"] { width: 80px; }
-  .primary { background: var(--accent); border-color: var(--accent); color: #fff; }
 
   .timer-row {
-    display: flex; justify-content: space-between; align-items: baseline;
+    display: flex; flex-wrap: wrap; gap: 12px;
+    justify-content: space-between; align-items: center;
     margin-bottom: 8px;
   }
   .timer { font-size: 2.5rem; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--accent); }
-  .live { color: var(--muted); font-variant-numeric: tabular-nums; }
+  .timer.paused { color: var(--warn); }
+  .status { color: var(--muted); font-size: .95rem; margin-left: 8px; font-weight: 500; }
+  .actions { display: flex; gap: 8px; }
+  .actions button { padding: 8px 18px; font-weight: 600; }
+  #pauseBtn { border-color: var(--warn); color: var(--warn); }
+  #stopBtn { border-color: var(--stop); color: var(--stop); }
+  #restartBtn { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .live { color: var(--muted); font-variant-numeric: tabular-nums; margin-bottom: 8px; }
   .progress { height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; margin-bottom: 16px; }
   .progress > div { height: 100%; width: 100%; background: var(--accent); transition: width .2s linear; }
 
-  .passage {
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 20px;
-    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-    font-size: 1.15rem;
-    line-height: 1.8;
-    max-height: 220px;
-    overflow-y: auto;
-    margin-bottom: 12px;
-    word-wrap: break-word;
-  }
-  .passage span { color: var(--muted); }
-  .passage span.correct { color: var(--correct); }
-  .passage span.wrong { color: var(--wrong); background: var(--wrong-bg); border-radius: 2px; }
-  .passage span.current { border-left: 2px solid var(--accent); margin-left: -2px; animation: blink 1s step-end infinite; }
-  @keyframes blink { 50% { border-color: transparent; } }
-
   textarea {
     width: 100%;
-    min-height: 120px;
+    min-height: 340px;
     font: inherit;
-    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-    font-size: 1.05rem;
-    padding: 14px;
+    font-size: 1.1rem;
+    line-height: 1.7;
+    padding: 16px;
     border-radius: 12px;
     border: 2px solid var(--border);
     background: var(--panel);
@@ -128,45 +114,46 @@
 <body>
 <main>
   <h1>Typing Speed Test</h1>
-  <p class="subtitle">Pick a time, start typing the text below, and see your words per minute.</p>
+  <p class="subtitle">Type freely in the box. The timer starts on your first key. Pause or stop whenever you like.</p>
 
   <div class="controls" id="timeControls">
     <span class="label">Time:</span>
-    <button data-time="15">15s</button>
-    <button data-time="30">30s</button>
-    <button data-time="60" class="active">1 min</button>
+    <button data-time="0">No limit</button>
+    <button data-time="60">1 min</button>
     <button data-time="120">2 min</button>
-    <button data-time="300">5 min</button>
-    <input type="number" id="customTime" min="5" max="3600" placeholder="sec" aria-label="Custom time in seconds">
+    <button data-time="300" class="active">5 min</button>
+    <button data-time="600">10 min</button>
+    <input type="number" id="customTime" min="1" max="180" placeholder="min" aria-label="Custom time in minutes">
     <button id="setCustom">Set</button>
-    <button id="restart" class="primary">Restart</button>
   </div>
 
   <div class="timer-row">
-    <div class="timer" id="timer">1:00</div>
-    <div class="live" id="live">0 WPM · 100% accuracy</div>
+    <div><span class="timer" id="timer">5:00</span><span class="status" id="status">Ready</span></div>
+    <div class="actions">
+      <button id="pauseBtn" disabled>Pause</button>
+      <button id="stopBtn" disabled>Stop</button>
+      <button id="restartBtn">Restart</button>
+    </div>
   </div>
+  <div class="live" id="live">0 words · 0 WPM</div>
   <div class="progress"><div id="progressBar"></div></div>
 
-  <div class="passage" id="passage" aria-label="Text to type"></div>
-
-  <textarea id="input" placeholder="Click here and start typing… the timer starts on your first key." spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off"></textarea>
-  <p class="hint">Tip: press <strong>Esc</strong> to restart at any time.</p>
+  <textarea id="input" placeholder="Start typing here… the timer starts automatically." spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off"></textarea>
+  <p class="hint">Shortcuts: <strong>Ctrl + Space</strong> pause / resume · <strong>Esc</strong> restart</p>
 
   <section class="results" id="results">
     <h2>Your results</h2>
     <div class="stats">
-      <div class="stat"><div class="value" id="rWpm">0</div><div class="name">WPM (net)</div></div>
-      <div class="stat"><div class="value" id="rRaw">0</div><div class="name">Raw WPM</div></div>
-      <div class="stat"><div class="value" id="rAcc">0%</div><div class="name">Accuracy</div></div>
-      <div class="stat"><div class="value" id="rChars">0</div><div class="name">Characters (correct / wrong)</div></div>
-      <div class="stat"><div class="value" id="rTime">0s</div><div class="name">Time taken</div></div>
+      <div class="stat"><div class="value" id="rWpm">0</div><div class="name">Words per minute</div></div>
+      <div class="stat"><div class="value" id="rWords">0</div><div class="name">Words typed</div></div>
+      <div class="stat"><div class="value" id="rChars">0</div><div class="name">Characters</div></div>
       <div class="stat"><div class="value" id="rCpm">0</div><div class="name">Chars per minute</div></div>
+      <div class="stat"><div class="value" id="rTime">0:00</div><div class="name">Typing time (pauses excluded)</div></div>
     </div>
     <div class="history">
       <h2>Recent tests</h2>
       <table>
-        <thead><tr><th>#</th><th>Time</th><th>WPM</th><th>Accuracy</th></tr></thead>
+        <thead><tr><th>#</th><th>Time</th><th>Words</th><th>WPM</th></tr></thead>
         <tbody id="historyBody"></tbody>
       </table>
     </div>
@@ -174,166 +161,140 @@
 </main>
 
 <script>
-const SENTENCES = [
-  "The quick brown fox jumps over the lazy dog.",
-  "Practice makes progress, not perfection.",
-  "A journey of a thousand miles begins with a single step.",
-  "Typing quickly is useful, but typing accurately is even more important.",
-  "The sun rose slowly over the quiet hills and painted the sky gold.",
-  "Good habits are built one small action at a time.",
-  "Coffee in the morning helps many people start their day with energy.",
-  "Reading books opens doors to new worlds and fresh ideas.",
-  "Keep your fingers on the home row and your eyes on the screen.",
-  "Every expert was once a beginner who refused to give up.",
-  "The library was silent except for the soft turning of pages.",
-  "Technology changes fast, so learning never really stops.",
-  "She packed a small bag, locked the door, and walked to the station.",
-  "Rain tapped gently on the window while the city slept.",
-  "Clear goals and steady effort lead to remarkable results.",
-  "Music has a way of bringing people together across every border.",
-  "He planted a tree today so that someone could enjoy its shade tomorrow.",
-  "The best time to start was yesterday; the next best time is now.",
-  "Mountains look small from far away but feel enormous up close.",
-  "Curiosity is the engine that drives discovery and invention."
-];
-
 const $ = id => document.getElementById(id);
-const passageEl = $("passage"), inputEl = $("input"), timerEl = $("timer"),
-      liveEl = $("live"), progressEl = $("progressBar"), resultsEl = $("results");
+const inputEl = $("input"), timerEl = $("timer"), statusEl = $("status"), liveEl = $("live"),
+      progressEl = $("progressBar"), resultsEl = $("results"),
+      pauseBtn = $("pauseBtn"), stopBtn = $("stopBtn");
 
-let duration = 60;       // seconds chosen
-let text = "";           // passage to type
-let spans = [];
-let startTime = null;
+let duration = 300;   // seconds; 0 = no limit (counts up)
+let state = "ready";  // ready | running | paused | done
+let accumulated = 0;  // seconds of typing before the current run segment
+let segmentStart = 0; // performance.now() when the current segment began
 let tickHandle = null;
-let finished = false;
 let history = [];
 
-try { history = JSON.parse(localStorage.getItem("typingHistory") || "[]"); } catch (e) { history = []; }
-
-function buildText() {
-  // Enough random sentences that even fast typists won't run out.
-  const count = Math.max(8, Math.ceil(duration / 60 * 25));
-  const parts = [];
-  for (let i = 0; i < count; i++) parts.push(SENTENCES[Math.floor(Math.random() * SENTENCES.length)]);
-  return parts.join(" ");
-}
+try { history = JSON.parse(localStorage.getItem("typingHistory2") || "[]"); } catch (e) { history = []; }
 
 function formatTime(sec) {
-  sec = Math.max(0, Math.ceil(sec));
-  const m = Math.floor(sec / 60), s = sec % 60;
-  return m + ":" + String(s).padStart(2, "0");
+  sec = Math.max(0, Math.floor(sec));
+  const h = Math.floor(sec / 3600), m = Math.floor(sec % 3600 / 60), s = sec % 60;
+  const mm = h ? String(m).padStart(2, "0") : m;
+  return (h ? h + ":" : "") + mm + ":" + String(s).padStart(2, "0");
 }
 
-function reset() {
-  clearInterval(tickHandle);
-  tickHandle = null;
-  startTime = null;
-  finished = false;
-  text = buildText();
-  passageEl.innerHTML = "";
-  spans = [...text].map(ch => {
-    const s = document.createElement("span");
-    s.textContent = ch;
-    passageEl.appendChild(s);
-    return s;
-  });
-  spans[0].classList.add("current");
-  passageEl.scrollTop = 0;
-  inputEl.value = "";
-  inputEl.disabled = false;
-  timerEl.textContent = formatTime(duration);
-  progressEl.style.width = "100%";
-  liveEl.textContent = "0 WPM · 100% accuracy";
-  resultsEl.classList.remove("show");
-  inputEl.focus();
+function elapsed() {
+  return accumulated + (state === "running" ? (performance.now() - segmentStart) / 1000 : 0);
 }
 
-function computeStats(elapsedSec) {
-  const typed = inputEl.value;
-  let correct = 0;
-  for (let i = 0; i < typed.length; i++) if (typed[i] === text[i]) correct++;
-  const wrong = typed.length - correct;
-  const minutes = Math.max(elapsedSec, 1) / 60;
-  // Standard definition: one "word" = 5 characters.
-  const raw = typed.length / 5 / minutes;
-  const net = Math.max(0, (typed.length / 5 - wrong) / minutes);
-  const acc = typed.length ? (correct / typed.length) * 100 : 100;
-  return { correct, wrong, raw, net, acc, cpm: correct / minutes, elapsed: elapsedSec };
+function computeStats(sec) {
+  const text = inputEl.value;
+  const words = (text.trim().match(/\S+/g) || []).length;
+  const chars = text.replace(/\s/g, "").length;
+  const minutes = sec / 60;
+  return {
+    words, chars, sec,
+    wpm: minutes > 0 ? words / minutes : 0,
+    cpm: minutes > 0 ? chars / minutes : 0,
+  };
 }
 
-function elapsed() { return startTime ? (performance.now() - startTime) / 1000 : 0; }
-
-function tick() {
+function render() {
   const e = elapsed();
-  const left = duration - e;
-  timerEl.textContent = formatTime(left);
-  progressEl.style.width = Math.max(0, left / duration * 100) + "%";
+  if (duration) {
+    timerEl.textContent = formatTime(Math.ceil(duration - e));
+    progressEl.style.width = Math.max(0, (duration - e) / duration * 100) + "%";
+  } else {
+    timerEl.textContent = formatTime(e);
+    progressEl.style.width = "100%";
+  }
   const st = computeStats(e);
-  liveEl.textContent = Math.round(st.net) + " WPM · " + Math.round(st.acc) + "% accuracy";
-  if (left <= 0) finish();
+  liveEl.textContent = st.words + " words · " + Math.round(st.wpm) + " WPM";
+  timerEl.classList.toggle("paused", state === "paused");
+  statusEl.textContent = { ready: "Ready", running: "Running", paused: "Paused", done: "Stopped" }[state];
+  pauseBtn.textContent = state === "paused" ? "Resume" : "Pause";
+  pauseBtn.disabled = !(state === "running" || state === "paused");
+  stopBtn.disabled = !(state === "running" || state === "paused");
+  if (duration && e >= duration && state === "running") stop();
 }
 
-function finish() {
-  if (finished) return;
-  finished = true;
+function start() {
+  state = "running";
+  segmentStart = performance.now();
+  tickHandle = setInterval(render, 200);
+}
+
+function pause() {
+  if (state !== "running") return;
+  accumulated = elapsed();
+  state = "paused";
+  clearInterval(tickHandle);
+  render();
+}
+
+function resume() {
+  if (state !== "paused") return;
+  start();
+  inputEl.focus();
+  render();
+}
+
+function stop() {
+  if (state !== "running" && state !== "paused") return;
+  accumulated = duration ? Math.min(elapsed(), duration) : elapsed();
+  state = "done";
   clearInterval(tickHandle);
   inputEl.disabled = true;
-  const e = Math.min(elapsed(), duration);
-  const st = computeStats(e);
-  timerEl.textContent = formatTime(duration - e);
+  render();
 
-  $("rWpm").textContent = Math.round(st.net);
-  $("rRaw").textContent = Math.round(st.raw);
-  $("rAcc").textContent = st.acc.toFixed(1) + "%";
-  $("rChars").textContent = st.correct + " / " + st.wrong;
-  $("rTime").textContent = e.toFixed(1) + "s";
+  const st = computeStats(accumulated);
+  $("rWpm").textContent = Math.round(st.wpm);
+  $("rWords").textContent = st.words;
+  $("rChars").textContent = st.chars;
   $("rCpm").textContent = Math.round(st.cpm);
+  $("rTime").textContent = formatTime(accumulated);
 
-  history.unshift({ time: duration, wpm: Math.round(st.net), acc: st.acc.toFixed(1) });
+  history.unshift({ sec: Math.floor(accumulated), words: st.words, wpm: Math.round(st.wpm) });
   history = history.slice(0, 10);
-  try { localStorage.setItem("typingHistory", JSON.stringify(history)); } catch (e) {}
+  try { localStorage.setItem("typingHistory2", JSON.stringify(history)); } catch (e) {}
   renderHistory();
   resultsEl.classList.add("show");
   resultsEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
 }
 
+function reset() {
+  clearInterval(tickHandle);
+  state = "ready";
+  accumulated = 0;
+  inputEl.value = "";
+  inputEl.disabled = false;
+  resultsEl.classList.remove("show");
+  render();
+  inputEl.focus();
+}
+
 function renderHistory() {
   $("historyBody").innerHTML = history.map((h, i) =>
-    `<tr><td>${i + 1}</td><td>${formatTime(h.time)}</td><td>${h.wpm}</td><td>${h.acc}%</td></tr>`
+    `<tr><td>${i + 1}</td><td>${formatTime(h.sec)}</td><td>${h.words}</td><td>${h.wpm}</td></tr>`
   ).join("") || `<tr><td colspan="4">No tests yet</td></tr>`;
 }
 
 inputEl.addEventListener("input", () => {
-  if (finished) return;
-  if (!startTime) {
-    startTime = performance.now();
-    tickHandle = setInterval(tick, 100);
-  }
-  const typed = inputEl.value;
-  for (let i = 0; i < spans.length; i++) {
-    const s = spans[i];
-    s.classList.remove("correct", "wrong", "current");
-    if (i < typed.length) s.classList.add(typed[i] === text[i] ? "correct" : "wrong");
-  }
-  const cur = spans[typed.length];
-  if (cur) {
-    cur.classList.add("current");
-    // Keep the cursor visible in the passage box.
-    const top = cur.offsetTop - passageEl.offsetTop;
-    if (top > passageEl.scrollTop + passageEl.clientHeight - 60 || top < passageEl.scrollTop) {
-      passageEl.scrollTop = top - 40;
-    }
-  } else {
-    finish(); // typed the whole passage
-  }
-  tick();
+  if (state === "ready") start();
+  else if (state === "paused") resume(); // typing while paused resumes the timer
+  render();
 });
 
-// Block paste so results stay honest.
-inputEl.addEventListener("paste", e => e.preventDefault());
+pauseBtn.addEventListener("click", () => state === "paused" ? resume() : pause());
+stopBtn.addEventListener("click", stop);
+$("restartBtn").addEventListener("click", reset);
 
-document.addEventListener("keydown", e => { if (e.key === "Escape") reset(); });
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape") reset();
+  if (e.key === " " && e.ctrlKey) {
+    e.preventDefault();
+    state === "paused" ? resume() : pause();
+  }
+});
 
 function setDuration(sec) {
   duration = sec;
@@ -346,12 +307,11 @@ document.querySelectorAll("#timeControls button[data-time]").forEach(b =>
   b.addEventListener("click", () => setDuration(Number(b.dataset.time))));
 
 $("setCustom").addEventListener("click", () => {
-  const v = Math.round(Number($("customTime").value));
-  if (v >= 5 && v <= 3600) setDuration(v);
-  else alert("Please enter a time between 5 and 3600 seconds.");
+  const v = Number($("customTime").value);
+  if (v >= 1 && v <= 180) setDuration(Math.round(v * 60));
+  else alert("Please enter a time between 1 and 180 minutes.");
 });
 $("customTime").addEventListener("keydown", e => { if (e.key === "Enter") $("setCustom").click(); });
-$("restart").addEventListener("click", reset);
 
 renderHistory();
 reset();

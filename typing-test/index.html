@@ -1,0 +1,360 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Typing Speed Test</title>
+<style>
+  :root {
+    --bg: #f5f6f8;
+    --panel: #ffffff;
+    --text: #1d2330;
+    --muted: #6b7385;
+    --accent: #3b6ef5;
+    --correct: #1f9d55;
+    --wrong: #d64545;
+    --wrong-bg: #fde8e8;
+    --border: #dde1e8;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #14161b;
+      --panel: #1d2027;
+      --text: #e6e8ee;
+      --muted: #8a91a3;
+      --accent: #6b93ff;
+      --correct: #4cc38a;
+      --wrong: #ff6b6b;
+      --wrong-bg: #3a1f22;
+      --border: #2d313b;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.5;
+  }
+  main { max-width: 860px; margin: 0 auto; padding: 32px 16px 48px; }
+  h1 { margin: 0 0 4px; font-size: 1.8rem; }
+  .subtitle { margin: 0 0 24px; color: var(--muted); }
+
+  .controls {
+    display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+    margin-bottom: 16px;
+  }
+  .controls .label { color: var(--muted); margin-right: 4px; }
+  button, input[type="number"] {
+    font: inherit;
+    border: 1px solid var(--border);
+    background: var(--panel);
+    color: var(--text);
+    border-radius: 8px;
+    padding: 6px 12px;
+  }
+  button { cursor: pointer; }
+  button:hover { border-color: var(--accent); }
+  button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  input[type="number"] { width: 80px; }
+  .primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+  .timer-row {
+    display: flex; justify-content: space-between; align-items: baseline;
+    margin-bottom: 8px;
+  }
+  .timer { font-size: 2.5rem; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--accent); }
+  .live { color: var(--muted); font-variant-numeric: tabular-nums; }
+  .progress { height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; margin-bottom: 16px; }
+  .progress > div { height: 100%; width: 100%; background: var(--accent); transition: width .2s linear; }
+
+  .passage {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 1.15rem;
+    line-height: 1.8;
+    max-height: 220px;
+    overflow-y: auto;
+    margin-bottom: 12px;
+    word-wrap: break-word;
+  }
+  .passage span { color: var(--muted); }
+  .passage span.correct { color: var(--correct); }
+  .passage span.wrong { color: var(--wrong); background: var(--wrong-bg); border-radius: 2px; }
+  .passage span.current { border-left: 2px solid var(--accent); margin-left: -2px; animation: blink 1s step-end infinite; }
+  @keyframes blink { 50% { border-color: transparent; } }
+
+  textarea {
+    width: 100%;
+    min-height: 120px;
+    font: inherit;
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 1.05rem;
+    padding: 14px;
+    border-radius: 12px;
+    border: 2px solid var(--border);
+    background: var(--panel);
+    color: var(--text);
+    resize: vertical;
+  }
+  textarea:focus { outline: none; border-color: var(--accent); }
+  textarea:disabled { opacity: .6; }
+  .hint { color: var(--muted); font-size: .9rem; margin: 6px 0 20px; }
+
+  .results {
+    display: none;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+  }
+  .results.show { display: block; }
+  .results h2 { margin: 0 0 16px; font-size: 1.2rem; }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; }
+  .stat { border: 1px solid var(--border); border-radius: 10px; padding: 12px; }
+  .stat .value { font-size: 1.8rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .stat .name { color: var(--muted); font-size: .85rem; }
+  .history { margin-top: 20px; }
+  .history table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  .history th, .history td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); }
+  .history th { color: var(--muted); font-weight: 500; font-size: .85rem; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Typing Speed Test</h1>
+  <p class="subtitle">Pick a time, start typing the text below, and see your words per minute.</p>
+
+  <div class="controls" id="timeControls">
+    <span class="label">Time:</span>
+    <button data-time="15">15s</button>
+    <button data-time="30">30s</button>
+    <button data-time="60" class="active">1 min</button>
+    <button data-time="120">2 min</button>
+    <button data-time="300">5 min</button>
+    <input type="number" id="customTime" min="5" max="3600" placeholder="sec" aria-label="Custom time in seconds">
+    <button id="setCustom">Set</button>
+    <button id="restart" class="primary">Restart</button>
+  </div>
+
+  <div class="timer-row">
+    <div class="timer" id="timer">1:00</div>
+    <div class="live" id="live">0 WPM · 100% accuracy</div>
+  </div>
+  <div class="progress"><div id="progressBar"></div></div>
+
+  <div class="passage" id="passage" aria-label="Text to type"></div>
+
+  <textarea id="input" placeholder="Click here and start typing… the timer starts on your first key." spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off"></textarea>
+  <p class="hint">Tip: press <strong>Esc</strong> to restart at any time.</p>
+
+  <section class="results" id="results">
+    <h2>Your results</h2>
+    <div class="stats">
+      <div class="stat"><div class="value" id="rWpm">0</div><div class="name">WPM (net)</div></div>
+      <div class="stat"><div class="value" id="rRaw">0</div><div class="name">Raw WPM</div></div>
+      <div class="stat"><div class="value" id="rAcc">0%</div><div class="name">Accuracy</div></div>
+      <div class="stat"><div class="value" id="rChars">0</div><div class="name">Characters (correct / wrong)</div></div>
+      <div class="stat"><div class="value" id="rTime">0s</div><div class="name">Time taken</div></div>
+      <div class="stat"><div class="value" id="rCpm">0</div><div class="name">Chars per minute</div></div>
+    </div>
+    <div class="history">
+      <h2>Recent tests</h2>
+      <table>
+        <thead><tr><th>#</th><th>Time</th><th>WPM</th><th>Accuracy</th></tr></thead>
+        <tbody id="historyBody"></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+<script>
+const SENTENCES = [
+  "The quick brown fox jumps over the lazy dog.",
+  "Practice makes progress, not perfection.",
+  "A journey of a thousand miles begins with a single step.",
+  "Typing quickly is useful, but typing accurately is even more important.",
+  "The sun rose slowly over the quiet hills and painted the sky gold.",
+  "Good habits are built one small action at a time.",
+  "Coffee in the morning helps many people start their day with energy.",
+  "Reading books opens doors to new worlds and fresh ideas.",
+  "Keep your fingers on the home row and your eyes on the screen.",
+  "Every expert was once a beginner who refused to give up.",
+  "The library was silent except for the soft turning of pages.",
+  "Technology changes fast, so learning never really stops.",
+  "She packed a small bag, locked the door, and walked to the station.",
+  "Rain tapped gently on the window while the city slept.",
+  "Clear goals and steady effort lead to remarkable results.",
+  "Music has a way of bringing people together across every border.",
+  "He planted a tree today so that someone could enjoy its shade tomorrow.",
+  "The best time to start was yesterday; the next best time is now.",
+  "Mountains look small from far away but feel enormous up close.",
+  "Curiosity is the engine that drives discovery and invention."
+];
+
+const $ = id => document.getElementById(id);
+const passageEl = $("passage"), inputEl = $("input"), timerEl = $("timer"),
+      liveEl = $("live"), progressEl = $("progressBar"), resultsEl = $("results");
+
+let duration = 60;       // seconds chosen
+let text = "";           // passage to type
+let spans = [];
+let startTime = null;
+let tickHandle = null;
+let finished = false;
+let history = [];
+
+try { history = JSON.parse(localStorage.getItem("typingHistory") || "[]"); } catch (e) { history = []; }
+
+function buildText() {
+  // Enough random sentences that even fast typists won't run out.
+  const count = Math.max(8, Math.ceil(duration / 60 * 25));
+  const parts = [];
+  for (let i = 0; i < count; i++) parts.push(SENTENCES[Math.floor(Math.random() * SENTENCES.length)]);
+  return parts.join(" ");
+}
+
+function formatTime(sec) {
+  sec = Math.max(0, Math.ceil(sec));
+  const m = Math.floor(sec / 60), s = sec % 60;
+  return m + ":" + String(s).padStart(2, "0");
+}
+
+function reset() {
+  clearInterval(tickHandle);
+  tickHandle = null;
+  startTime = null;
+  finished = false;
+  text = buildText();
+  passageEl.innerHTML = "";
+  spans = [...text].map(ch => {
+    const s = document.createElement("span");
+    s.textContent = ch;
+    passageEl.appendChild(s);
+    return s;
+  });
+  spans[0].classList.add("current");
+  passageEl.scrollTop = 0;
+  inputEl.value = "";
+  inputEl.disabled = false;
+  timerEl.textContent = formatTime(duration);
+  progressEl.style.width = "100%";
+  liveEl.textContent = "0 WPM · 100% accuracy";
+  resultsEl.classList.remove("show");
+  inputEl.focus();
+}
+
+function computeStats(elapsedSec) {
+  const typed = inputEl.value;
+  let correct = 0;
+  for (let i = 0; i < typed.length; i++) if (typed[i] === text[i]) correct++;
+  const wrong = typed.length - correct;
+  const minutes = Math.max(elapsedSec, 1) / 60;
+  // Standard definition: one "word" = 5 characters.
+  const raw = typed.length / 5 / minutes;
+  const net = Math.max(0, (typed.length / 5 - wrong) / minutes);
+  const acc = typed.length ? (correct / typed.length) * 100 : 100;
+  return { correct, wrong, raw, net, acc, cpm: correct / minutes, elapsed: elapsedSec };
+}
+
+function elapsed() { return startTime ? (performance.now() - startTime) / 1000 : 0; }
+
+function tick() {
+  const e = elapsed();
+  const left = duration - e;
+  timerEl.textContent = formatTime(left);
+  progressEl.style.width = Math.max(0, left / duration * 100) + "%";
+  const st = computeStats(e);
+  liveEl.textContent = Math.round(st.net) + " WPM · " + Math.round(st.acc) + "% accuracy";
+  if (left <= 0) finish();
+}
+
+function finish() {
+  if (finished) return;
+  finished = true;
+  clearInterval(tickHandle);
+  inputEl.disabled = true;
+  const e = Math.min(elapsed(), duration);
+  const st = computeStats(e);
+  timerEl.textContent = formatTime(duration - e);
+
+  $("rWpm").textContent = Math.round(st.net);
+  $("rRaw").textContent = Math.round(st.raw);
+  $("rAcc").textContent = st.acc.toFixed(1) + "%";
+  $("rChars").textContent = st.correct + " / " + st.wrong;
+  $("rTime").textContent = e.toFixed(1) + "s";
+  $("rCpm").textContent = Math.round(st.cpm);
+
+  history.unshift({ time: duration, wpm: Math.round(st.net), acc: st.acc.toFixed(1) });
+  history = history.slice(0, 10);
+  try { localStorage.setItem("typingHistory", JSON.stringify(history)); } catch (e) {}
+  renderHistory();
+  resultsEl.classList.add("show");
+  resultsEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+function renderHistory() {
+  $("historyBody").innerHTML = history.map((h, i) =>
+    `<tr><td>${i + 1}</td><td>${formatTime(h.time)}</td><td>${h.wpm}</td><td>${h.acc}%</td></tr>`
+  ).join("") || `<tr><td colspan="4">No tests yet</td></tr>`;
+}
+
+inputEl.addEventListener("input", () => {
+  if (finished) return;
+  if (!startTime) {
+    startTime = performance.now();
+    tickHandle = setInterval(tick, 100);
+  }
+  const typed = inputEl.value;
+  for (let i = 0; i < spans.length; i++) {
+    const s = spans[i];
+    s.classList.remove("correct", "wrong", "current");
+    if (i < typed.length) s.classList.add(typed[i] === text[i] ? "correct" : "wrong");
+  }
+  const cur = spans[typed.length];
+  if (cur) {
+    cur.classList.add("current");
+    // Keep the cursor visible in the passage box.
+    const top = cur.offsetTop - passageEl.offsetTop;
+    if (top > passageEl.scrollTop + passageEl.clientHeight - 60 || top < passageEl.scrollTop) {
+      passageEl.scrollTop = top - 40;
+    }
+  } else {
+    finish(); // typed the whole passage
+  }
+  tick();
+});
+
+// Block paste so results stay honest.
+inputEl.addEventListener("paste", e => e.preventDefault());
+
+document.addEventListener("keydown", e => { if (e.key === "Escape") reset(); });
+
+function setDuration(sec) {
+  duration = sec;
+  document.querySelectorAll("#timeControls button[data-time]").forEach(b =>
+    b.classList.toggle("active", Number(b.dataset.time) === sec));
+  reset();
+}
+
+document.querySelectorAll("#timeControls button[data-time]").forEach(b =>
+  b.addEventListener("click", () => setDuration(Number(b.dataset.time))));
+
+$("setCustom").addEventListener("click", () => {
+  const v = Math.round(Number($("customTime").value));
+  if (v >= 5 && v <= 3600) setDuration(v);
+  else alert("Please enter a time between 5 and 3600 seconds.");
+});
+$("customTime").addEventListener("keydown", e => { if (e.key === "Enter") $("setCustom").click(); });
+$("restart").addEventListener("click", reset);
+
+renderHistory();
+reset();
+</script>
+</body>
+</html>
